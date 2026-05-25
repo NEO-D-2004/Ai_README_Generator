@@ -1,0 +1,85 @@
+{
+  "name": "ai-readme-generator",
+  "displayName": "AI README Generator",
+  "description": "Generate high-quality README.md files using NVIDIA AI platform open-source models",
+  "version": "1.0.0",
+  "publisher": "ai-readme-generator",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Documentation",
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ai-readme-generator-sidebar",
+          "title": "AI README Generator",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "ai-readme-generator-sidebar": [
+        {
+          "type": "webview",
+          "id": "ai-readme-generator-view",
+          "name": "README Generator UI"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "ai-readme-generator.generate",
+        "title": "AI README: Open Panel"
+      },
+      {
+        "command": "ai-readme-generator.clearApiKey",
+        "title": "AI README: Clear API Key"
+      }
+    ],
+    "configuration": {
+      "title": "AI README Generator",
+      "properties": {
+        "aiReadmeGenerator.defaultModel": {
+          "type": "string",
+          "default": "meta/llama-3.3-70b-instruct",
+          "description": "The default NVIDIA LLM model to use."
+        },
+        "aiReadmeGenerator.temperature": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "The temperature setting for generation."
+        },
+        "aiReadmeGenerator.maxTokens": {
+          "type": "integer",
+          "default": 4096,
+          "description": "The maximum number of tokens to generate."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile && npm run build-webview",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "build-webview": "npm run build --prefix webview-ui",
+    "build-all": "npm run compile && npm run build-webview"
+  },
+  "devDependencies": {
+    "@types/node": "^18.11.18",
+    "@types/vscode": "^1.74.0",
+    "esbuild": "^0.16.17",
+    "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "glob": "^10.3.10"
+  }
+}

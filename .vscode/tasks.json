@@ -1,0 +1,30 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "compile",
+      "group": "build",
+      "problemMatcher": "$tsc",
+      "label": "npm: compile"
+    },
+    {
+      "type": "npm",
+      "script": "build-webview",
+      "group": "build",
+      "problemMatcher": [],
+      "label": "npm: build-webview"
+    },
+    {
+      "label": "build-all",
+      "dependsOn": [
+        "npm: compile",
+        "npm: build-webview"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}
