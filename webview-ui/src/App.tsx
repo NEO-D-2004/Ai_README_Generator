@@ -20,7 +20,10 @@ import {
   AlertCircle,
   Copy,
   Check,
-  Edit2
+  Edit2,
+  Folder,
+  FolderOpen,
+  ChevronRight
 } from 'lucide-react';
 
 const vscode = (window as any).acquireVsCodeApi
@@ -92,8 +95,13 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState('');
   const [isCopied, setIsCopied] = useState(false);
 
+  // Phase 2 Explorer state
+  const [explorerData, setExplorerData] = useState<{ tree: any[]; table: any[] } | null>(null);
+  const [explorerFormat, setExplorerFormat] = useState<'json' | 'xml'>('json');
+  const [explorerError, setExplorerError] = useState('');
+
   // UI Tabs / Accordion Toggles
-  const [activeTab, setActiveTab] = useState<'preview' | 'raw' | 'sectionEdit'>('preview');
+  const [activeTab, setActiveTab] = useState<'preview' | 'raw' | 'sectionEdit' | 'projectExplorer'>('preview');
   const [collapsedPanels, setCollapsedPanels] = useState<Record<string, boolean>>({
     api: false,
     analyzer: false,
@@ -105,10 +113,17 @@ export default function App() {
   const [editSectionName, setEditSectionName] = useState('Installation');
   const [sectionPrompt, setSectionPrompt] = useState('');
 
+  const loadExplorerData = (format: 'json' | 'xml') => {
+    setExplorerError('');
+    setExplorerData(null);
+    vscode.postMessage({ type: 'loadExplorerData', format });
+  };
+
   // Fetch initial API key and start scanning
   useEffect(() => {
     vscode.postMessage({ type: 'getApiKey' });
     vscode.postMessage({ type: 'scanWorkspace' });
+    loadExplorerData('json');
   }, []);
 
   // Handle incoming messages
@@ -135,6 +150,15 @@ export default function App() {
           const updatedReadme = replaceSection(readmeContent, msg.sectionName, msg.content);
           setReadmeContent(updatedReadme);
           vscode.postMessage({ type: 'showInfo', message: `Section "${msg.sectionName}" regenerated!` });
+          break;
+        case 'explorerDataResult':
+          setExplorerData(msg.payload);
+          setExplorerFormat(msg.format);
+          setExplorerError('');
+          break;
+        case 'explorerDataError':
+          setExplorerError(msg.message);
+          setExplorerData(null);
           break;
         case 'status':
           setStatusMsg(msg.message);
@@ -549,8 +573,18 @@ export default function App() {
               <Edit2 size={14} />
               <span>Section Editor</span>
             </button>
+            <button
+              className={`tab-btn ${activeTab === 'projectExplorer' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('projectExplorer');
+                loadExplorerData(explorerFormat);
+              }}
+            >
+              <Folder size={14} />
+              <span>Explorer Dashboard</span>
+            </button>
             
-            {readmeContent && (
+            {readmeContent && activeTab !== 'projectExplorer' && (
               <div className="tab-actions">
                 <button className="btn-ghost btn-sm" onClick={handleCopy}>
                   {isCopied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
@@ -565,7 +599,98 @@ export default function App() {
           </div>
 
           <div className="tab-body">
-            {readmeContent ? (
+            {activeTab === 'projectExplorer' ? (
+              <div className="explorer-dashboard-layout">
+                <div className="explorer-header-bar">
+                  <div className="explorer-header-left">
+                    <span className="form-label" style={{ marginRight: '6px' }}>Format:</span>
+                    <select
+                      className="form-select"
+                      style={{ width: '150px', padding: '2px 6px', margin: 0, height: '24px' }}
+                      value={explorerFormat}
+                      onChange={(e) => {
+                        const fmt = e.target.value as 'json' | 'xml';
+                        setExplorerFormat(fmt);
+                        loadExplorerData(fmt);
+                      }}
+                    >
+                      <option value="json">sample-data.json</option>
+                      <option value="xml">sample-data.xml</option>
+                    </select>
+                    <span className={`explorer-badge ${explorerFormat === 'json' ? 'explorer-badge-json' : 'explorer-badge-xml'}`} style={{ marginLeft: '8px' }}>
+                      {explorerFormat.toUpperCase()} Format
+                    </span>
+                  </div>
+                  <div className="explorer-header-right">
+                    <button className="btn-secondary btn-sm" style={{ height: '24px', padding: '2px 8px' }} onClick={() => loadExplorerData(explorerFormat)}>
+                      <RefreshCw size={12} />
+                      <span style={{ marginLeft: '4px' }}>Refresh</span>
+                    </button>
+                  </div>
+                </div>
+
+                {explorerError && (
+                  <div className="error-banner" style={{ marginBottom: '12px' }}>
+                    <AlertCircle size={16} />
+                    <span>{explorerError}</span>
+                  </div>
+                )}
+
+                {explorerData ? (
+                  <div className="explorer-split-panel">
+                    <div className="explorer-panel">
+                      <div className="explorer-panel-title">
+                        <FolderOpen size={14} />
+                        <span>Project Tree Structure</span>
+                      </div>
+                      <div className="tree-container">
+                        <ul className="tree-list">
+                          {explorerData.tree.map((node, i) => (
+                            <TreeNodeComponent key={i} node={node} />
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="explorer-panel">
+                      <div className="explorer-panel-title">
+                        <List size={14} />
+                        <span>Data Table View</span>
+                      </div>
+                      <div className="explorer-table-container">
+                        <table className="explorer-table">
+                          <thead>
+                            <tr>
+                              <th>File</th>
+                              <th>Type</th>
+                              <th>Size</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {explorerData.table.map((row, i) => (
+                              <tr key={i}>
+                                <td style={{ fontWeight: 500 }}>{row.file}</td>
+                                <td>
+                                  <span className="badge-chip secondary" style={{ fontSize: '10px' }}>
+                                    {row.type}
+                                  </span>
+                                </td>
+                                <td style={{ opacity: 0.85 }}>{row.size}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="preview-placeholder">
+                    <RefreshCw className="spinner" size={32} />
+                    <p>Loading explorer data...</p>
+                  </div>
+                )}
+              </div>
+            ) : readmeContent ? (
               <>
                 {activeTab === 'preview' && (
                   <div
@@ -621,5 +746,55 @@ export default function App() {
         </section>
       </main>
     </div>
+  );
+}
+
+interface TreeNode {
+  name: string;
+  type: 'folder' | 'file';
+  children?: TreeNode[];
+}
+
+function TreeNodeComponent({ node }: { node: TreeNode }) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  const handleToggle = () => {
+    if (node.type === 'folder') {
+      setIsOpen(!isOpen);
+    }
+  };
+
+  const isFolder = node.type === 'folder';
+
+  return (
+    <li className="tree-node">
+      <div className="tree-node-content" onClick={handleToggle}>
+        {isFolder ? (
+          <>
+            <span className="tree-node-icon" style={{ opacity: 0.7, color: 'var(--accent-purple)' }}>
+              {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </span>
+            <span className="tree-node-icon" style={{ color: 'var(--accent-purple)' }}>
+              {isOpen ? <FolderOpen size={14} /> : <Folder size={14} />}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="tree-node-icon" style={{ width: '14px' }}></span>
+            <span className="tree-node-icon" style={{ color: 'var(--vscode-descriptionForeground, #8e8e8e)' }}>
+              <FileText size={14} />
+            </span>
+          </>
+        )}
+        <span>{node.name}</span>
+      </div>
+      {isFolder && isOpen && node.children && (
+        <ul className="tree-folder-children">
+          {node.children.map((child, idx) => (
+            <TreeNodeComponent key={idx} node={child} />
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }

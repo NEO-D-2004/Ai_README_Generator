@@ -20,6 +20,7 @@ Featuring an interactive, VS Code-themed sidebar Webview UI, the extension provi
 - **🛠️ Section Checklist & Custom Prompts**: Toggle specific sections (Installation, Usage, Folder Structure, API, FAQ, etc.) and supply custom markdown rules or styling guidelines.
 - **📝 Live Markdown Preview**: Render and read your generated README live using `markdown-it`, or switch to **Raw** text edit mode.
 - **🔄 Targeted Section Regeneration**: Highlight or select individual sections, supply direct prompts (e.g. "Add database migration steps"), and let the LLM rebuild just that section without touching the rest of your README.
+- **📁 Project Explorer Dashboard**: A split-pane dashboard that dynamically renders collapsible recursive Tree Views (left) and Data Tables (right) from JSON or XML files.
 - **🔐 Secure Key Storage**: Uses VS Code's native `SecretStorage` to save your NVIDIA API key securely.
 
 ---
@@ -33,6 +34,7 @@ Featuring an interactive, VS Code-themed sidebar Webview UI, the extension provi
 - **AI Requests**: Axios (pointing to NVIDIA's completions endpoint)
 - **Markdown Rendering**: `markdown-it`
 - **File System Parsing**: Node `fs/promises` & `path` APIs
+- **XML Parsing**: `xml2js` (translates XML tree nodes and rows to JSON)
 - **Icons**: `lucide-react`
 
 ---
@@ -44,6 +46,9 @@ Ai_README_Generator/
 ├── .vscode/
 │   ├── launch.json            # Run Extension configuration profile
 │   └── tasks.json             # Compiles extension & webview in sync
+├── data/
+│   ├── sample-data.json       # Baseline JSON explorer data
+│   └── sample-data.xml        # Baseline XML explorer data
 ├── media/
 │   └── icon.svg               # Extension sidebar logo
 ├── out/                       # Compiled assets (bundled via esbuild and Vite)
@@ -57,7 +62,7 @@ Ai_README_Generator/
 │   ├── analyzer.ts            # Workspace scanning and metadata extraction
 │   ├── extension.ts           # Activates commands and registers Webview
 │   ├── generator.ts           # Queries NVIDIA NIM completions API
-│   └── webviewPanel.ts        # Orchestrates IPC bridge and SecretStorage
+│   └── webviewPanel.ts        # Orchestrates IPC bridge, JSON/XML parses & SecretStorage
 ├── webview-ui/                # React Webview client code
 │   ├── src/
 │   │   ├── App.tsx            # Main UI state, panels, and tabs
@@ -136,6 +141,7 @@ You can customize the extension via VS Code settings (`ctrl+,` or `cmd+,`):
    - **Raw**: Edit the raw markdown text block directly.
    - **Section Editor**: Select an isolated section (e.g., *Installation*), write a instruction (e.g. *"add yarn global install instruction"*), and click **Regenerate Section**. The editor will query the AI and replace only that section in your draft.
 6. **Save**: Click the **Save** button in the tab bar. This writes the completed `README.md` to your workspace root and automatically opens it in your editor.
+7. **Explorer Dashboard**: Click the *Explorer Dashboard* tab in the webview. Toggle between the dropdown formats (`sample-data.json` / `sample-data.xml`) to see the recursive Tree View (collapsible directories, folder/file icons) and the corresponding file statistics Data Table. Click **Refresh** to reload the files if they are modified.
 
 ---
 
