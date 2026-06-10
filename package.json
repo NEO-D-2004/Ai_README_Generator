@@ -1,16 +1,21 @@
 {
-  "name": "ai-readme-generator",
-  "displayName": "AI README Generator",
+  "name": "ai-readme-markdown-generator",
+  "displayName": "AI README Markdown Generator",
   "description": "Generate high-quality README.md files using NVIDIA AI platform open-source models",
   "version": "1.0.0",
-  "publisher": "ai-readme-generator",
+  "publisher": "DHANUSH-008",
   "engines": {
     "vscode": "^1.74.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NEO-D-2004/AI-README-Generator"
+  },
   "categories": [
-    "Documentation",
+    "Machine Learning",
     "Other"
   ],
+  "icon": "media/logo.ico",
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
@@ -19,7 +24,7 @@
         {
           "id": "ai-readme-generator-sidebar",
           "title": "AI README Generator",
-          "icon": "media/icon.svg"
+          "icon": "media/app-icon.svg"
         }
       ]
     },
@@ -76,10 +81,11 @@
     "@types/node": "^18.11.18",
     "@types/vscode": "^1.74.0",
     "@types/xml2js": "^0.4.14",
-    "esbuild": "^0.16.17",
+    "esbuild": "^0.28.0",
     "typescript": "^4.9.4"
   },
   "dependencies": {
+    "@vscode/vsce": "^3.9.2",
     "axios": "^1.6.0",
     "glob": "^10.3.10",
     "xml2js": "^0.6.2"

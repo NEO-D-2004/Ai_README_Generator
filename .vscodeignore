@@ -1,0 +1,10 @@
+.vscode/**
+.vscodeignore
+.gitignore
+tsconfig.json
+esbuild.js
+src/**
+node_modules/**
+webview-ui/**
+AgentArtifacts/**
+*.vsix
