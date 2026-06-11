@@ -10,6 +10,8 @@ An enterprise-grade VS Code extension that automatically scans your codebase, an
 
 Featuring an interactive, VS Code-themed sidebar Webview UI, the extension provides workspace diagnostics, section-by-section customization, and a targeted **Section Editor** that lets you regenerate single parts of your documentation on-the-fly.
 
+
+
 ---
 
 ## Key Features
@@ -91,6 +93,8 @@ You can customize the extension via VS Code settings (`ctrl+,` or `cmd+,`):
 ---
 
 ## Installation & Setup
+
+[VsCode MarketPlace link](https://marketplace.visualstudio.com/items?itemName=DHANUSH-008.ai-readme-markdown-generator)
 
 ### Prerequisites
 - **VS Code**: Version `1.74.0` or higher.

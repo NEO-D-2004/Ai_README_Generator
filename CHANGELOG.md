@@ -7,7 +7,7 @@ All notable changes to the **AI README Markdown Generator** extension will be do
 ### Added
 - **README Referencing**: The workspace scanner now detects and reads pre-existing `README.md` files (up to 1MB) and feeds them to the NVIDIA LLM during generation, allowing it to preserve custom configurations and guide information.
 - **Overwrite Safety Dialog**: Implemented a native VS Code warning confirmation modal when attempting to save and overwrite an existing `README.md` file, preventing accidental data loss.
-- **Premium Activity Bar Icon**: Added a separate custom SVG asset (`media/app-logo.svg`) representing a gradient document page and AI sparkles, configured as the primary Activity Bar icon.
+
 
 ### Fixed
 - **Onboarding Tour UI Alignment**: Fixed onboarding tooltip card horizontal spill-over by calculating and clamping positioning coordinates between a 10px padding from the left and right window borders.
