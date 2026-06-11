@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { ReadmeGeneratorViewProvider } from './webviewPanel';
 
 export function activate(context: vscode.ExtensionContext) {
-  const provider = new ReadmeGeneratorViewProvider(context.extensionUri, context.secrets);
+  const provider = new ReadmeGeneratorViewProvider(context);
 
   // Register Webview View Provider
   context.subscriptions.push(

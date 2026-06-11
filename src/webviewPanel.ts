@@ -91,9 +91,16 @@ export class ReadmeGeneratorViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
 
   constructor(
-    private readonly _extensionUri: vscode.Uri,
-    private readonly _secretStorage: vscode.SecretStorage
+    private readonly _context: vscode.ExtensionContext
   ) {}
+
+  private get _extensionUri(): vscode.Uri {
+    return this._context.extensionUri;
+  }
+
+  private get _secretStorage(): vscode.SecretStorage {
+    return this._context.secrets;
+  }
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -112,7 +119,11 @@ export class ReadmeGeneratorViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async (data) => {
       switch (data.type) {
         case 'getApiKey': {
-          const apiKey = (await this._secretStorage.get('NVIDIA_API_KEY')) || '';
+          let apiKey = (await this._secretStorage.get('NVIDIA_API_KEY')) || '';
+          if (!apiKey) {
+            apiKey = 'nvapi-default-readme-generator-key-placeholder';
+            await this._secretStorage.store('NVIDIA_API_KEY', apiKey);
+          }
           webviewView.webview.postMessage({ type: 'apiKeyResult', key: apiKey });
           break;
         }
@@ -126,6 +137,49 @@ export class ReadmeGeneratorViewProvider implements vscode.WebviewViewProvider {
           await this._secretStorage.delete('NVIDIA_API_KEY');
           vscode.window.showInformationMessage('NVIDIA API Key cleared.');
           webviewView.webview.postMessage({ type: 'apiKeyResult', key: '' });
+          break;
+        }
+        case 'getHistory': {
+          const history = this._context.globalState.get<any[]>('readme_generation_history') || [];
+          webviewView.webview.postMessage({ type: 'historyResult', history });
+          break;
+        }
+        case 'saveHistory': {
+          const history = this._context.globalState.get<any[]>('readme_generation_history') || [];
+          const newItem = data.item;
+          history.unshift(newItem);
+          if (history.length > 50) {
+            history.pop();
+          }
+          await this._context.globalState.update('readme_generation_history', history);
+          webviewView.webview.postMessage({ type: 'historyResult', history });
+          break;
+        }
+        case 'deleteHistoryItem': {
+          let history = this._context.globalState.get<any[]>('readme_generation_history') || [];
+          history = history.filter((item: any) => item.id !== data.id);
+          await this._context.globalState.update('readme_generation_history', history);
+          webviewView.webview.postMessage({ type: 'historyResult', history });
+          break;
+        }
+        case 'clearHistory': {
+          await this._context.globalState.update('readme_generation_history', []);
+          webviewView.webview.postMessage({ type: 'historyResult', history: [] });
+          break;
+        }
+        case 'getTourState': {
+          const hasCompletedTour = this._context.globalState.get<boolean>('has_completed_tour') || false;
+          webviewView.webview.postMessage({ type: 'tourStateResult', hasCompletedTour });
+          break;
+        }
+        case 'completeTour': {
+          await this._context.globalState.update('has_completed_tour', true);
+          webviewView.webview.postMessage({ type: 'tourStateResult', hasCompletedTour: true });
+          break;
+        }
+        case 'resetTour': {
+          await this._context.globalState.update('has_completed_tour', false);
+          webviewView.webview.postMessage({ type: 'tourStateResult', hasCompletedTour: false });
           break;
         }
         case 'scanWorkspace': {
@@ -151,8 +205,8 @@ export class ReadmeGeneratorViewProvider implements vscode.WebviewViewProvider {
           webviewView.webview.postMessage({ type: 'status', message: 'Generating README with NVIDIA LLM...' });
           try {
             const apiKey = (await this._secretStorage.get('NVIDIA_API_KEY')) || data.options.apiKey;
-            if (!apiKey) {
-              throw new Error('NVIDIA API Key is missing. Please save it in the settings first.');
+            if (!apiKey || apiKey === 'nvapi-default-readme-generator-key-placeholder') {
+              throw new Error('Default API key placeholder detected. Please click the Settings (gear) icon on the top-right and save a valid NVIDIA API Key.');
             }
 
             const readmeContent = await generateReadme({
@@ -165,7 +219,31 @@ export class ReadmeGeneratorViewProvider implements vscode.WebviewViewProvider {
               customPrompt: data.options.customPrompt
             });
 
+            // Save to history in the extension globalState
+            const history = this._context.globalState.get<any[]>('readme_generation_history') || [];
+            const newItem = {
+              id: Date.now().toString(),
+              timestamp: new Date().toLocaleString(),
+              projectName: data.options.metadata?.projectName || 'Unknown Project',
+              model: data.options.model,
+              temperature: data.options.temperature,
+              maxTokens: data.options.maxTokens,
+              sections: data.options.sections,
+              customPrompt: data.options.originalCustomPrompt || '',
+              includeBadges: !!data.options.includeBadges,
+              includeDiagrams: !!data.options.includeDiagrams,
+              readmeContent: readmeContent,
+              metadata: data.options.metadata
+            };
+            history.unshift(newItem);
+            if (history.length > 50) {
+              history.pop();
+            }
+            await this._context.globalState.update('readme_generation_history', history);
+
+            // Send messages back to the webview
             webviewView.webview.postMessage({ type: 'readmeGenerated', content: readmeContent });
+            webviewView.webview.postMessage({ type: 'historyResult', history });
           } catch (err: any) {
             vscode.window.showErrorMessage(`Generation failed: ${err.message}`);
             webviewView.webview.postMessage({ type: 'error', message: err.message });
@@ -176,8 +254,8 @@ export class ReadmeGeneratorViewProvider implements vscode.WebviewViewProvider {
           webviewView.webview.postMessage({ type: 'status', message: `Regenerating section "${data.options.sectionName}"...` });
           try {
             const apiKey = (await this._secretStorage.get('NVIDIA_API_KEY')) || data.options.apiKey;
-            if (!apiKey) {
-              throw new Error('NVIDIA API Key is missing. Please save it in the settings first.');
+            if (!apiKey || apiKey === 'nvapi-default-readme-generator-key-placeholder') {
+              throw new Error('Default API key placeholder detected. Please click the Settings (gear) icon on the top-right and save a valid NVIDIA API Key.');
             }
 
             const sectionContent = await generateReadmeSection({
@@ -212,6 +290,24 @@ export class ReadmeGeneratorViewProvider implements vscode.WebviewViewProvider {
           try {
             const rootPath = workspaceFolders[0].uri.fsPath;
             const readmePath = path.join(rootPath, 'README.md');
+            
+            let fileExists = false;
+            try {
+              await fs.access(readmePath);
+              fileExists = true;
+            } catch (e) {}
+
+            if (fileExists) {
+              const confirm = await vscode.window.showWarningMessage(
+                'README.md already exists in the workspace. Do you want to overwrite it?',
+                { modal: true },
+                'Overwrite'
+              );
+              if (confirm !== 'Overwrite') {
+                return; // User cancelled
+              }
+            }
+
             await fs.writeFile(readmePath, data.content, 'utf-8');
             vscode.window.showInformationMessage('README.md saved successfully!');
             

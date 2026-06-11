@@ -23,7 +23,11 @@ import {
   Edit2,
   Folder,
   FolderOpen,
-  ChevronRight
+  ChevronRight,
+  Settings,
+  History,
+  X,
+  Trash2
 } from 'lucide-react';
 
 const vscode = (window as any).acquireVsCodeApi
@@ -71,7 +75,66 @@ interface ProjectMetadata {
   hasEnvExample: boolean;
   hasCicd: boolean;
   gitRemoteUrl?: string;
+  existingReadmeContent?: string;
 }
+
+interface TourStep {
+  targetId: string | null;
+  title: string;
+  description: string;
+  placement: 'bottom' | 'top' | 'left' | 'right' | 'center';
+}
+
+const TOUR_STEPS: TourStep[] = [
+  {
+    targetId: null,
+    title: "Welcome to AI README Generator! 👋",
+    description: "This guide will walk you through setting up the extension so you can generate professional README files in seconds using NVIDIA open-source LLMs.",
+    placement: 'center'
+  },
+  {
+    targetId: "tour-settings-btn",
+    title: "1. Setup NVIDIA API Key 🔐",
+    description: "Click the Settings (gear) icon to open the configuration. You will need to enter your NVIDIA API key. If you don't have one, register for free at build.nvidia.com.",
+    placement: 'bottom'
+  },
+  {
+    targetId: "tour-model-select",
+    title: "2. Choose AI Model 🤖",
+    description: "Use this quick selector to choose an AI model (e.g. Llama 3.3 70B or Nemotron). Changes synchronize automatically with settings.",
+    placement: 'bottom'
+  },
+  {
+    targetId: "tour-workspace-analysis",
+    title: "3. Workspace Analysis 📁",
+    description: "Displays project information like detected framework, language, packages, and folders. We feed this context into the LLM during generation.",
+    placement: 'bottom'
+  },
+  {
+    targetId: "tour-sections",
+    title: "4. Select README Sections 📑",
+    description: "Choose which sections to include in the generated README. Check or uncheck headings like Installation, Tech Stack, or License to fit your needs.",
+    placement: 'bottom'
+  },
+  {
+    targetId: "tour-instructions",
+    title: "5. Custom Instructions 💡",
+    description: "Add custom prompt guidelines! For example, write in a specific voice, explain environment secrets, or customize deployment guides.",
+    placement: 'top'
+  },
+  {
+    targetId: "tour-generate-btn",
+    title: "6. Generate README! ⚡",
+    description: "Click this button to generate the markdown documentation. A live preview will render immediately below, allowing you to edit and save it.",
+    placement: 'top'
+  },
+  {
+    targetId: "tour-history-btn",
+    title: "7. Generation History 🕒",
+    description: "View previous generations here. Clicking a history item restores all sections, prompts, metadata, and generated text so you can start right where you left off.",
+    placement: 'bottom'
+  }
+];
 
 export default function App() {
   // Config & API State
@@ -83,6 +146,16 @@ export default function App() {
   const [maxTokens, setMaxTokens] = useState(4096);
   const [includeBadges, setIncludeBadges] = useState(true);
   const [includeDiagrams, setIncludeDiagrams] = useState(true);
+
+  // Modal and drawer visibility
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [generationHistory, setGenerationHistory] = useState<any[]>([]);
+
+  // Onboarding Tour state
+  const [showTour, setShowTour] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+  const [tourTargetRect, setTourTargetRect] = useState<DOMRect | null>(null);
 
   // Analysis State
   const [metadata, setMetadata] = useState<ProjectMetadata | null>(null);
@@ -123,6 +196,8 @@ export default function App() {
   useEffect(() => {
     vscode.postMessage({ type: 'getApiKey' });
     vscode.postMessage({ type: 'scanWorkspace' });
+    vscode.postMessage({ type: 'getHistory' });
+    vscode.postMessage({ type: 'getTourState' });
     loadExplorerData('json');
   }, []);
 
@@ -133,6 +208,17 @@ export default function App() {
       switch (msg.type) {
         case 'apiKeyResult':
           setApiKey(msg.key);
+          break;
+        case 'tourStateResult':
+          if (!msg.hasCompletedTour) {
+            setShowTour(true);
+            setTourStep(0);
+          } else {
+            setShowTour(false);
+          }
+          break;
+        case 'historyResult':
+          setGenerationHistory(msg.history);
           break;
         case 'scanResult':
           setMetadata(msg.data);
@@ -174,6 +260,133 @@ export default function App() {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [readmeContent]);
+
+  const updateTourTargetRect = () => {
+    const step = TOUR_STEPS[tourStep];
+    if (step && step.targetId) {
+      const el = document.getElementById(step.targetId);
+      if (el) {
+        setTourTargetRect(el.getBoundingClientRect());
+        el.classList.add('tour-highlighted-element');
+        return;
+      }
+    }
+    setTourTargetRect(null);
+  };
+
+  useEffect(() => {
+    document.querySelectorAll('.tour-highlighted-element').forEach(el => {
+      el.classList.remove('tour-highlighted-element');
+    });
+
+    if (showTour) {
+      updateTourTargetRect();
+    }
+  }, [tourStep, showTour]);
+
+  useEffect(() => {
+    if (showTour) {
+      window.addEventListener('resize', updateTourTargetRect);
+      window.addEventListener('scroll', updateTourTargetRect, true);
+    }
+    return () => {
+      window.removeEventListener('resize', updateTourTargetRect);
+      window.removeEventListener('scroll', updateTourTargetRect, true);
+    };
+  }, [showTour, tourStep]);
+
+  const handleTourNext = () => {
+    if (tourStep < TOUR_STEPS.length - 1) {
+      setTourStep(tourStep + 1);
+    } else {
+      handleTourFinish();
+    }
+  };
+
+  const handleTourBack = () => {
+    if (tourStep > 0) {
+      setTourStep(tourStep - 1);
+    }
+  };
+
+  const handleTourFinish = () => {
+    setShowTour(false);
+    document.querySelectorAll('.tour-highlighted-element').forEach(el => {
+      el.classList.remove('tour-highlighted-element');
+    });
+    vscode.postMessage({ type: 'completeTour' });
+  };
+
+  const handleTourRestart = () => {
+    setIsSettingsOpen(false);
+    setIsHistoryOpen(false);
+    vscode.postMessage({ type: 'resetTour' });
+  };
+
+  const getTooltipStyle = () => {
+    if (!tourTargetRect) {
+      return {
+        position: 'fixed' as const,
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 1200
+      };
+    }
+
+    const step = TOUR_STEPS[tourStep];
+    const spacing = 12;
+    const tooltipWidth = step.targetId === null ? 290 : 260;
+    let top = 0;
+    let left = 0;
+    let transform = '';
+
+    if (step.placement === 'bottom' || step.placement === 'top') {
+      top = step.placement === 'bottom' ? tourTargetRect.bottom + spacing : tourTargetRect.top - spacing;
+      let desiredLeft = tourTargetRect.left + (tourTargetRect.width / 2) - (tooltipWidth / 2);
+      
+      if (desiredLeft < 10) {
+        desiredLeft = 10;
+      }
+      if (desiredLeft + tooltipWidth > window.innerWidth - 10) {
+        desiredLeft = window.innerWidth - tooltipWidth - 10;
+      }
+      
+      left = desiredLeft;
+      transform = step.placement === 'top' ? 'translateY(-100%)' : '';
+    } else if (step.placement === 'left') {
+      top = tourTargetRect.top + (tourTargetRect.height / 2);
+      left = tourTargetRect.left - spacing;
+      transform = 'translate(-100%, -50%)';
+      
+      if (left - tooltipWidth < 10) {
+        top = tourTargetRect.top - spacing;
+        left = Math.max(10, Math.min(tourTargetRect.left + (tourTargetRect.width / 2) - (tooltipWidth / 2), window.innerWidth - tooltipWidth - 10));
+        transform = 'translateY(-100%)';
+      }
+    } else if (step.placement === 'right') {
+      top = tourTargetRect.top + (tourTargetRect.height / 2);
+      left = tourTargetRect.right + spacing;
+      transform = 'translateY(-50%)';
+      
+      if (left + tooltipWidth > window.innerWidth - 10) {
+        top = tourTargetRect.bottom + spacing;
+        left = Math.max(10, Math.min(tourTargetRect.left + (tourTargetRect.width / 2) - (tooltipWidth / 2), window.innerWidth - tooltipWidth - 10));
+        transform = '';
+      }
+    }
+
+    if (top < 10) { top = 10; }
+    if (left < 10) { left = 10; }
+
+    return {
+      position: 'fixed' as const,
+      top: `${top}px`,
+      left: `${left}px`,
+      transform,
+      zIndex: 1200
+    };
+  };
 
   const togglePanel = (panel: string) => {
     setCollapsedPanels((prev) => ({ ...prev, [panel]: !prev[panel] }));
@@ -220,9 +433,45 @@ export default function App() {
         maxTokens,
         metadata,
         sections,
-        customPrompt: promptModifiers
+        customPrompt: promptModifiers,
+        originalCustomPrompt: customPrompt,
+        includeBadges,
+        includeDiagrams
       }
     });
+  };
+
+  const handleLoadHistoryItem = (item: any) => {
+    if (item.model !== 'meta/llama-3.3-70b-instruct' &&
+        item.model !== 'meta/llama-3.1-70b-instruct' &&
+        item.model !== 'meta/llama-3.1-8b-instruct' &&
+        item.model !== 'nvidia/llama-3.1-nemotron-70b-instruct') {
+      setModel('custom');
+      setCustomModel(item.model);
+    } else {
+      setModel(item.model);
+    }
+    setTemperature(item.temperature);
+    setMaxTokens(item.maxTokens);
+    setSections(item.sections || DEFAULT_SECTIONS);
+    setCustomPrompt(item.customPrompt || '');
+    setIncludeBadges(!!item.includeBadges);
+    setIncludeDiagrams(!!item.includeDiagrams);
+    setReadmeContent(item.readmeContent);
+    if (item.metadata) {
+      setMetadata(item.metadata);
+    }
+    setActiveTab('preview');
+    setIsHistoryOpen(false);
+  };
+
+  const handleDeleteHistoryItem = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    vscode.postMessage({ type: 'deleteHistoryItem', id });
+  };
+
+  const handleClearHistory = () => {
+    vscode.postMessage({ type: 'clearHistory' });
   };
 
   const handleRegenerateSection = () => {
@@ -291,6 +540,47 @@ export default function App() {
     <div className="app-container">
       {/* HEADER SECTION */}
       <header className="app-header">
+        <div className="header-top-row">
+          <div className="header-left-group">
+            <select
+              className="quick-model-select"
+              id="tour-model-select"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              title="Quick Switch Model"
+            >
+              <option value="meta/llama-3.3-70b-instruct">Llama 3.3 70B</option>
+              <option value="meta/llama-3.1-70b-instruct">Llama 3.1 70B</option>
+              <option value="meta/llama-3.1-8b-instruct">Llama 3.1 8B</option>
+              <option value="nvidia/llama-3.1-nemotron-70b-instruct">Nemotron 70B</option>
+              {model === 'custom' && <option value="custom">Custom NIM</option>}
+            </select>
+          </div>
+          <div className="header-right-group">
+            <button
+              className={`header-icon-btn ${isHistoryOpen ? 'active' : ''}`}
+              id="tour-history-btn"
+              onClick={() => {
+                setIsHistoryOpen(!isHistoryOpen);
+                setIsSettingsOpen(false);
+              }}
+              title="Generation History"
+            >
+              <History size={15} />
+            </button>
+            <button
+              className={`header-icon-btn ${isSettingsOpen ? 'active' : ''}`}
+              id="tour-settings-btn"
+              onClick={() => {
+                setIsSettingsOpen(!isSettingsOpen);
+                setIsHistoryOpen(false);
+              }}
+              title="LLM Settings"
+            >
+              <Settings size={15} />
+            </button>
+          </div>
+        </div>
         <div className="header-info">
           <h1>AI README Generator</h1>
           {metadata ? (
@@ -321,121 +611,9 @@ export default function App() {
       <main className="app-content">
         {/* PANEL COLLAPSIBLES */}
         <div className="panels-container">
-          
-          {/* PANEL 1: NVIDIA API SETTINGS */}
-          <section className="panel-card">
-            <button className="panel-header" onClick={() => togglePanel('api')}>
-              <div className="panel-title-group">
-                <Cpu size={16} />
-                <span>NVIDIA LLM Config</span>
-              </div>
-              {collapsedPanels.api ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-            </button>
-            {!collapsedPanels.api && (
-              <div className="panel-body">
-                <div className="form-group">
-                  <label className="form-label">
-                    <Key size={12} />
-                    <span>NVIDIA API Key</span>
-                  </label>
-                  <div className="input-with-button">
-                    <input
-                      type={showKey ? 'text' : 'password'}
-                      className="form-input"
-                      placeholder="Paste nvapi-..."
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                    />
-                    <button
-                      className="icon-button"
-                      title={showKey ? 'Hide key' : 'Show key'}
-                      onClick={() => setShowKey(!showKey)}
-                    >
-                      <Eye size={14} />
-                    </button>
-                  </div>
-                  <div className="button-row">
-                    <button className="btn-secondary btn-sm" onClick={handleSaveApiKey}>Save</button>
-                    <button className="btn-ghost btn-sm" onClick={handleClearApiKey}>Clear</button>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">AI Model</label>
-                  <select
-                    className="form-select"
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                  >
-                    <option value="meta/llama-3.3-70b-instruct">Llama 3.3 70B (Recommended)</option>
-                    <option value="meta/llama-3.1-70b-instruct">Llama 3.1 70B</option>
-                    <option value="meta/llama-3.1-8b-instruct">Llama 3.1 8B (Fast)</option>
-                    <option value="nvidia/llama-3.1-nemotron-70b-instruct">Llama 3.1 Nemotron 70B</option>
-                    <option value="custom">Custom NVIDIA NIM Model...</option>
-                  </select>
-                </div>
-
-                {model === 'custom' && (
-                  <div className="form-group">
-                    <label className="form-label">Custom Model Identifier</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="e.g. meta/llama3-8b-instruct"
-                      value={customModel}
-                      onChange={(e) => setCustomModel(e.target.value)}
-                    />
-                  </div>
-                )}
-
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label className="form-label">Temperature: {temperature}</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1.5"
-                      step="0.1"
-                      className="form-range"
-                      value={temperature}
-                      onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Max Tokens</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={maxTokens}
-                      onChange={(e) => setMaxTokens(parseInt(e.target.value))}
-                    />
-                  </div>
-                </div>
-
-                <div className="checkbox-row">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={includeBadges}
-                      onChange={(e) => setIncludeBadges(e.target.checked)}
-                    />
-                    <span>Include badges</span>
-                  </label>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={includeDiagrams}
-                      onChange={(e) => setIncludeDiagrams(e.target.checked)}
-                    />
-                    <span>Include diagrams</span>
-                  </label>
-                </div>
-              </div>
-            )}
-          </section>
 
           {/* PANEL 2: WORKSPACE SCANNER INFO */}
-          <section className="panel-card">
+          <section className="panel-card" id="tour-workspace-analysis">
             <button className="panel-header" onClick={() => togglePanel('analyzer')}>
               <div className="panel-title-group">
                 <Terminal size={16} />
@@ -491,7 +669,7 @@ export default function App() {
           </section>
 
           {/* PANEL 3: SECTION SELECTION */}
-          <section className="panel-card">
+          <section className="panel-card" id="tour-sections">
             <button className="panel-header" onClick={() => togglePanel('sections')}>
               <div className="panel-title-group">
                 <List size={16} />
@@ -521,7 +699,7 @@ export default function App() {
           </section>
 
           {/* PANEL 4: CUSTOM PROMPTS */}
-          <section className="panel-card">
+          <section className="panel-card" id="tour-instructions">
             <button className="panel-header" onClick={() => togglePanel('prompts')}>
               <div className="panel-title-group">
                 <Sliders size={16} />
@@ -543,7 +721,7 @@ export default function App() {
           </section>
 
           {/* MASTER GENERATION BUTTON */}
-          <button className="btn-primary btn-full btn-lg" onClick={handleGenerate}>
+          <button className="btn-primary btn-full btn-lg" id="tour-generate-btn" onClick={handleGenerate}>
             <Play size={16} />
             <span>Generate README.md</span>
           </button>
@@ -745,6 +923,229 @@ export default function App() {
           </div>
         </section>
       </main>
+
+      {/* SETTINGS MODAL */}
+      {isSettingsOpen && (
+        <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <Cpu size={16} />
+                <span>NVIDIA LLM Config</span>
+              </div>
+              <button className="close-btn" onClick={() => setIsSettingsOpen(false)}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">
+                  <Key size={12} />
+                  <span>NVIDIA API Key</span>
+                </label>
+                <div className="input-with-button">
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    className="form-input"
+                    placeholder="Paste nvapi-..."
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                  />
+                  <button
+                    className="icon-button"
+                    title={showKey ? 'Hide key' : 'Show key'}
+                    onClick={() => setShowKey(!showKey)}
+                  >
+                    <Eye size={14} />
+                  </button>
+                </div>
+                <div className="button-row">
+                  <button className="btn-secondary btn-sm" onClick={() => { handleSaveApiKey(); setIsSettingsOpen(false); }}>Save</button>
+                  <button className="btn-ghost btn-sm" onClick={handleClearApiKey}>Clear</button>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">AI Model</label>
+                <select
+                  className="form-select"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                >
+                  <option value="meta/llama-3.3-70b-instruct">Llama 3.3 70B (Recommended)</option>
+                  <option value="meta/llama-3.1-70b-instruct">Llama 3.1 70B</option>
+                  <option value="meta/llama-3.1-8b-instruct">Llama 3.1 8B (Fast)</option>
+                  <option value="nvidia/llama-3.1-nemotron-70b-instruct">Llama 3.1 Nemotron 70B</option>
+                  <option value="custom">Custom NVIDIA NIM Model...</option>
+                </select>
+              </div>
+
+              {model === 'custom' && (
+                <div className="form-group">
+                  <label className="form-label">Custom Model Identifier</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. meta/llama3-8b-instruct"
+                    value={customModel}
+                    onChange={(e) => setCustomModel(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">Temperature: {temperature}</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1.5"
+                    step="0.1"
+                    className="form-range"
+                    value={temperature}
+                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Max Tokens</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={maxTokens}
+                    onChange={(e) => setMaxTokens(parseInt(e.target.value))}
+                  />
+                </div>
+              </div>
+
+              <div className="checkbox-row">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={includeBadges}
+                    onChange={(e) => setIncludeBadges(e.target.checked)}
+                  />
+                  <span>Include badges</span>
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={includeDiagrams}
+                    onChange={(e) => setIncludeDiagrams(e.target.checked)}
+                  />
+                  <span>Include diagrams</span>
+                </label>
+              </div>
+              <div style={{ marginTop: '12px', borderTop: '1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.15))', paddingTop: '12px' }}>
+                <button className="btn-ghost btn-sm btn-full" onClick={handleTourRestart}>
+                  <span>Restart Welcome Tour</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* HISTORY DRAWER */}
+      {isHistoryOpen && (
+        <div className="modal-overlay" onClick={() => setIsHistoryOpen(false)}>
+          <div className="modal-content history-drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <History size={16} />
+                <span>Generation History</span>
+              </div>
+              <button className="close-btn" onClick={() => setIsHistoryOpen(false)}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="modal-body history-body">
+              {generationHistory.length > 0 ? (
+                <div className="history-list-container">
+                  <div className="history-actions-row">
+                    <button className="btn-ghost btn-sm btn-full" onClick={handleClearHistory}>Clear All History</button>
+                  </div>
+                  <div className="history-items-list">
+                    {generationHistory.map((item) => (
+                      <div
+                        key={item.id}
+                        className="history-item-card"
+                        onClick={() => handleLoadHistoryItem(item)}
+                        title="Click to restore this generation"
+                      >
+                        <div className="history-item-header">
+                          <span className="history-item-project">{item.projectName}</span>
+                          <button
+                            className="history-delete-btn"
+                            title="Delete entry"
+                            onClick={(e) => handleDeleteHistoryItem(item.id, e)}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                        <div className="history-item-meta">
+                          <span>{item.model.split('/').pop()}</span>
+                          <span>•</span>
+                          <span>Temp: {item.temperature}</span>
+                        </div>
+                        <div className="history-item-time">{item.timestamp}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="empty-history">
+                  <History size={32} className="placeholder-icon" />
+                  <p>No history entries found.</p>
+                  <p style={{ fontSize: '11px', opacity: 0.7 }}>Successful generations will appear here.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ONBOARDING WELCOME TOUR OVERLAY */}
+      {showTour && (
+        <>
+          <div className="tour-overlay" onClick={handleTourFinish} />
+          <div className={`tour-tooltip-card placement-${TOUR_STEPS[tourStep].placement}`} style={getTooltipStyle()}>
+            <div className="tour-tooltip-header">
+              <span className="tour-step-badge">Step {tourStep + 1} of {TOUR_STEPS.length}</span>
+              <button className="tour-skip-btn" onClick={handleTourFinish}>Skip</button>
+            </div>
+            <div className="tour-tooltip-body">
+              <h3>{TOUR_STEPS[tourStep].title}</h3>
+              <p>{TOUR_STEPS[tourStep].description}</p>
+              
+              {tourStep === 1 && (
+                <div style={{ marginTop: '8px' }}>
+                  <a
+                    href="https://build.nvidia.com/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="tour-link"
+                    style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'underline' }}
+                  >
+                    Get free API Key at build.nvidia.com
+                  </a>
+                </div>
+              )}
+            </div>
+            <div className="tour-tooltip-footer">
+              <button
+                className="btn-ghost btn-sm"
+                onClick={handleTourBack}
+                disabled={tourStep === 0}
+                style={{ opacity: tourStep === 0 ? 0.4 : 1 }}
+              >
+                Back
+              </button>
+              <button className="btn-primary btn-sm" onClick={handleTourNext}>
+                {tourStep === TOUR_STEPS.length - 1 ? 'Finish' : 'Next'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

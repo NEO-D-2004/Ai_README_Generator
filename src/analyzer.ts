@@ -17,6 +17,7 @@ export interface ProjectMetadata {
   hasEnvExample: boolean;
   hasCicd: boolean;
   gitRemoteUrl?: string;
+  existingReadmeContent?: string;
 }
 
 const IGNORE_DIRS = new Set([
@@ -63,10 +64,14 @@ export async function analyzeWorkspace(workspaceRoot: string): Promise<ProjectMe
     // 1. Basic check for files
     metadata.hasReadme = rootFiles.some(f => f.toLowerCase() === 'readme.md');
     if (metadata.hasReadme) {
-      const readmePath = path.join(workspaceRoot, rootFiles.find(f => f.toLowerCase() === 'readme.md')!);
+      const readmeFilename = rootFiles.find(f => f.toLowerCase() === 'readme.md')!;
+      const readmePath = path.join(workspaceRoot, readmeFilename);
       try {
         const stat = await fs.stat(readmePath);
         metadata.readmeLength = stat.size;
+        if (stat.size < 1000 * 1024) {
+          metadata.existingReadmeContent = await fs.readFile(readmePath, 'utf-8');
+        }
       } catch (e) {
         // ignore
       }

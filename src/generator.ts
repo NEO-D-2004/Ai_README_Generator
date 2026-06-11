@@ -36,6 +36,10 @@ Adhere to these strict rules:
 4. Do NOT hallucinate dependencies or features that are not in the metadata.
 5. If certain files (like .env.example or Dockerfile) are detected, write detailed configuration and setup steps for them.`;
 
+  const existingReadmeSection = (metadata as any).existingReadmeContent
+    ? `\nEXISTING README.md (Refer to this and preserve/incorporate important existing information or custom details where relevant, but create a new updated README incorporating the new analysis details):\n\`\`\`markdown\n${(metadata as any).existingReadmeContent}\n\`\`\`\n`
+    : '';
+
   const userPrompt = `Analyze the project metadata below and generate a professional README.md.
 
 PROJECT METADATA:
@@ -56,7 +60,7 @@ FOLDER STRUCTURE:
 \`\`\`
 ${metadata.folderStructure}
 \`\`\`
-
+${existingReadmeSection}
 SECTIONS TO GENERATE:
 Generate a README containing ONLY these sections in a logical order:
 ${sections.map((s, i) => `${i + 1}. ${s}`).join('\n')}

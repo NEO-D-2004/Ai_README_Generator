@@ -93,37 +93,50 @@ You can customize the extension via VS Code settings (`ctrl+,` or `cmd+,`):
 ## Installation & Setup
 
 ### Prerequisites
-- [Node.js (v18.0.0+)](https://nodejs.org/)
-- [VS Code](https://code.visualstudio.com/)
-- An NVIDIA API Key. Register and obtain one for free at the [NVIDIA API Catalog](https://build.nvidia.com/).
+- **VS Code**: Version `1.74.0` or higher.
+- **NVIDIA API Key**: Register and obtain a free API key at the [NVIDIA API Catalog](https://build.nvidia.com/).
 
 ### Installation
-1. Clone the repository to your local machine:
-   ```bash
-   git clone https://github.com/your-username/Ai_README_Generator.git
-   cd Ai_README_Generator
-   ```
-2. Install dependencies for both the extension and the webview UI:
-   ```bash
-   npm install
-   ```
+
+#### Method 1: From Visual Studio Marketplace
+1. Open VS Code.
+2. Go to the Extensions View (`Ctrl+Shift+X` or `Cmd+Shift+X`).
+3. Search for **AI README Markdown Generator**.
+4. Click **Install**.
+
+#### Method 2: Manual VSIX Installation
+If you downloaded the `.vsix` bundle directly (e.g., `ai-readme-markdown-generator-1.0.5.vsix`):
+1. Open VS Code.
+2. Open the Extensions View, click the `...` (More Actions) button in the top-right corner of the Extensions panel.
+3. Select **Install from VSIX...**.
+4. Choose the downloaded `.vsix` file and click **Install**.
 
 ---
 
-## Development & Testing
+## Contributing & Development
 
-1. **Build the extension**:
-   Compile the extension host and build the React app assets in one command:
+If you wish to build, run, or contribute to the extension source code:
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/NEO-D-2004/AI-README-Generator.git
+   cd AI-README-Generator
+   ```
+2. **Install Dependencies**:
+   Install dependencies for the extension and front-end:
+   ```bash
+   npm install
+   ```
+3. **Compile and Build**:
+   Build the backend files and React webview assets simultaneously:
    ```bash
    npm run build-all
    ```
-2. **Debug in VS Code**:
-   - Open this directory in VS Code.
+4. **Run and Debug**:
+   - Open the folder in VS Code.
    - Press `F5` (or go to **Run & Debug** and click **Run Extension**).
-   - A new **Extension Development Host** window will open with the extension loaded.
-3. **Run the Extension**:
-   - In the debug window, click the **AI README** icon in the sidebar Activity Bar.
-   - Enter your NVIDIA API key, click **Save**, and start generating!
+   - In the new **Extension Development Host** window, click the **AI README** icon in the sidebar Activity Bar.
+   - Input your NVIDIA API key and start developing!
 
 ---
 

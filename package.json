@@ -2,7 +2,7 @@
   "name": "ai-readme-markdown-generator",
   "displayName": "AI README Markdown Generator",
   "description": "Generate high-quality README.md files using NVIDIA AI platform open-source models",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "publisher": "DHANUSH-008",
   "engines": {
     "vscode": "^1.74.0"
@@ -24,7 +24,7 @@
         {
           "id": "ai-readme-generator-sidebar",
           "title": "AI README Generator",
-          "icon": "media/app-icon.svg"
+          "icon": "media/app-logo.svg"
         }
       ]
     },
